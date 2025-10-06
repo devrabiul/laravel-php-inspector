@@ -17,7 +17,7 @@ class CollectPathsCommand extends Command
     {
         $paths = $this->option('path') 
             ? [$this->option('path')]
-            : [base_path('app'), base_path('config'), base_path('routes'), base_path('database')];
+            : [base_path('/')];
 
         $exclude = ['vendor', 'storage', 'bootstrap', 'node_modules', 'public'];
         $phpFiles = [];
