@@ -4,6 +4,10 @@ namespace Devrabiul\LaravelPhpInspector;
 
 use Illuminate\Support\ServiceProvider;
 use Devrabiul\LaravelPhpInspector\Commands\CheckCompatibilityCommand;
+use Devrabiul\LaravelPhpInspector\Commands\CollectPathsCommand;
+use Devrabiul\LaravelPhpInspector\Commands\ScanBatchCommand;
+use Devrabiul\LaravelPhpInspector\Commands\MergeReportsCommand;
+use Devrabiul\LaravelPhpInspector\Commands\PhpCompatCheckCommand;
 
 /**
  * Class LaravelPhpInspectorServiceProvider
@@ -54,6 +58,10 @@ class LaravelPhpInspectorServiceProvider extends ServiceProvider
     {
          $this->commands([
              CheckCompatibilityCommand::class,
+             CollectPathsCommand::class,
+             ScanBatchCommand::class,
+             MergeReportsCommand::class,
+             PhpCompatCheckCommand::class,
          ]);
     }
 

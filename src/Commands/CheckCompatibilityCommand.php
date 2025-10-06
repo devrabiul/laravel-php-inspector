@@ -4,6 +4,7 @@ namespace Devrabiul\LaravelPhpInspector\Commands;
 
 use Illuminate\Console\Command;
 use Symfony\Component\Process\Process;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 
 class CheckCompatibilityCommand extends Command
@@ -17,68 +18,99 @@ class CheckCompatibilityCommand extends Command
     public function handle()
     {
         $phpVersion = $this->option('php') ?: '8.4';
-        $exclude = ['vendor', 'storage'];
+        $exclude = ['vendor', 'storage', 'bootstrap', 'node_modules', 'public'];
         $failOnError = true;
         $showWarnings = true;
+        $batchSize = 500;
 
         $paths = $this->option('path')
             ? [$this->option('path')]
-            : [base_path('/')]; // keep it simple for now
+            : [base_path('/')];
 
-        $this->info(" 🔍 Checking PHP compatibility for PHP {$phpVersion}");
-        $this->info(" 📂 Paths to scan: " . implode(', ', $paths));
-        $this->info(" ❌ Excluded paths: " . implode(', ', $exclude));
+        $this->info("🔍 Checking PHP compatibility for PHP {$phpVersion}");
+        $this->info("📂 Paths to scan: " . implode(', ', $paths));
+        $this->info("❌ Excluded paths: " . implode(', ', $exclude));
 
-        $ignorePatterns = array_merge(['*.blade.php'], array_map(fn($d) => "$d/*", $exclude));
-
-        $allResults = [];
-        $totalFilesScanned = 0;
+        // 🧩 1. Collect PHP files (excluding blade + excluded dirs)
+        $this->info("📦 Collecting PHP files...");
+        $phpFiles = [];
 
         foreach ($paths as $path) {
+            $files = File::allFiles($path);
+            foreach ($files as $file) {
+                $filePath = $file->getRealPath();
+
+                if (Str::endsWith($filePath, '.php') && !Str::endsWith($filePath, '.blade.php')) {
+                    $isExcluded = collect($exclude)->contains(fn($dir) => Str::contains($filePath, DIRECTORY_SEPARATOR . $dir . DIRECTORY_SEPARATOR));
+                    if (!$isExcluded) {
+                        $phpFiles[] = $filePath;
+                    }
+                }
+            }
+        }
+
+        $this->info("📄 Found " . count($phpFiles) . " PHP files.");
+
+        // Save paths list for reference
+        $pathFile = storage_path('app/php-inspector-phpcompat_path.json');
+        file_put_contents($pathFile, json_encode($phpFiles, JSON_PRETTY_PRINT));
+        $this->info("💾 File list saved to: storage/app/php-inspector-phpcompat_path.json");
+
+        // 🧩 2. Process in batches
+        $allResults = [];
+        $batches = array_chunk($phpFiles, $batchSize);
+        $batchCount = count($batches);
+        $this->info("⚙️ Processing in {$batchCount} batches of {$batchSize} files each...\n");
+
+        foreach ($batches as $index => $batch) {
+            $this->info("➡️ Batch " . ($index + 1) . " of {$batchCount} (" . count($batch) . " files)");
+
             $command = [
+                PHP_BINARY,
+                '-d', 'memory_limit=-1',
                 base_path('vendor/squizlabs/php_codesniffer/bin/phpcs'),
                 '--standard=PHPCompatibility',
                 '--runtime-set', 'testVersion', $phpVersion,
                 '--report=json',
                 '--extensions=php',
-                '--ignore=' . implode(',', $ignorePatterns),
-                $path,
+                '--parallel=8',
             ];
 
             if (!$showWarnings) {
                 $command[] = '--warning-severity=0';
             }
 
-            $this->line(' 🧩 Executing: ' . implode(' ', $command));
+            // Add files to command
+            $command = array_merge($command, $batch);
 
             $process = new Process($command);
             $process->setWorkingDirectory(base_path());
             $process->setTimeout(null);
             $process->run();
 
-            $this->line(' ⚠️ STDERR: ' . $process->getErrorOutput());
-            $this->line(' 📤 STDOUT: ' . substr($process->getOutput(), 0, 200));
-
             $results = json_decode($process->getOutput(), true);
-
             if (isset($results['files'])) {
                 $allResults = array_merge($allResults, $results['files']);
-                $totalFilesScanned += count($results['files']);
             }
+
+            $this->line("✅ Completed batch " . ($index + 1));
         }
 
-        $totalErrors = 0;
-        $totalWarnings = 0;
+        // 🧩 3. Summarize and save
+        $totalFiles = count($allResults);
+        $totalErrors = collect($allResults)->sum('errors');
+        $totalWarnings = collect($allResults)->sum('warnings');
 
-        foreach ($allResults as $details) {
-            $totalErrors += $details['errors'] ?? 0;
-            $totalWarnings += $details['warnings'] ?? 0;
-        }
+        $reportPath = storage_path('app/php-inspector-phpcompat_report.json');
+        file_put_contents($reportPath, json_encode($allResults, JSON_PRETTY_PRINT));
 
-        $this->info("\n📄 Total files scanned: {$totalFilesScanned}");
-        $this->info(" ❌ Total errors: {$totalErrors}");
-        $this->info(" ⚠️ Total warnings: {$totalWarnings}");
+        $this->info("\n📊 Summary");
+        $this->info("📄 Files scanned: {$totalFiles}");
+        $this->info("❌ Errors: {$totalErrors}");
+        $this->info("⚠️ Warnings: {$totalWarnings}");
+        $this->info("💾 Report saved to: storage/app/php-inspector-phpcompat_report.json");
 
+        // 🧩 4. Display first 50 issues
         $tableData = [];
         foreach ($allResults as $file => $details) {
             foreach ($details['messages'] as $msg) {
