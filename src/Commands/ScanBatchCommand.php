@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\File;
 
 class ScanBatchCommand extends Command
 {
-    protected $signature = 'phpcompat:scan-batch
+    protected $signature = 'phpinspector-compat:scan-batch
                             {--php= : Target PHP version}
                             {--batchSize=500 : Number of files per batch}';
 
@@ -21,7 +21,7 @@ class ScanBatchCommand extends Command
         $pathFile = storage_path('app/php-inspector/phpcompat_path.php');
 
         if (!File::exists($pathFile)) {
-            $this->error("Path file not found. Run phpcompat:collect-paths first.");
+            $this->error("Path file not found. Run phpinspector-compat:collect-paths first.");
             return 1;
         }
 

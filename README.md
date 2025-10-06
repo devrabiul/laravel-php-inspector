@@ -52,7 +52,7 @@ php artisan vendor:publish --provider="Devrabiul\LaravelPhpInspector\LaravelPhpI
 Run the inspector to check your Laravel app for PHP compatibility:
 
 ```bash
-php artisan phpcompat:check
+php artisan phpinspector-compat:check
 ```
 
 ### Available Options
@@ -61,14 +61,14 @@ php artisan phpcompat:check
   Example:
 
   ```bash
-  php artisan phpcompat:check --php=8.4
+  php artisan phpinspector-compat:check --php=8.4
   ```
 
 * **`--path=`** → Specific path to scan (overrides config)
   Example:
 
   ```bash
-  php artisan phpcompat:check --path=app/Models
+  php artisan phpinspector-compat:check --path=app/Models
   ```
 
 By default, the command scans your entire Laravel project (excluding `vendor/`, `storage/`, and `*.blade.php` files).

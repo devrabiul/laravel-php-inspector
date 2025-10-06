@@ -9,7 +9,7 @@ use Illuminate\Support\Str;
 
 class CheckCompatibilityCommand extends Command
 {
-    protected $signature = 'phpcompat:check
+    protected $signature = 'phpinspector-compat:check
                             {--php= : Target PHP version (overrides config)}
                             {--path= : Specific path to scan (overrides config)}';
 

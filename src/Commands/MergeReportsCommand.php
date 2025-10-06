@@ -8,7 +8,7 @@ use Illuminate\Support\Str;
 
 class MergeReportsCommand extends Command
 {
-    protected $signature = 'phpcompat:merge-reports';
+    protected $signature = 'phpinspector-compat:merge-reports';
 
     protected $description = 'Merge all batch reports into a single JSON and display errors';
 

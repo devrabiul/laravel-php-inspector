@@ -8,7 +8,7 @@ use Illuminate\Support\Str;
 
 class CollectPathsCommand extends Command
 {
-    protected $signature = 'phpcompat:collect-paths
+    protected $signature = 'phpinspector-compat:collect-paths
                             {--path= : Specific path to scan}';
 
     protected $description = 'Collect all PHP files paths for scanning';
