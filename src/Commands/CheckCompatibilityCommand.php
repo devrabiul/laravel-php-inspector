@@ -5,54 +5,59 @@ namespace Devrabiul\LaravelPhpInspector\Commands;
 use Illuminate\Console\Command;
 use Symfony\Component\Process\Process;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\File;
 
 class CheckCompatibilityCommand extends Command
 {
-    protected $signature = 'phpcompat:check 
+    protected $signature = 'phpcompat:check
                             {--php= : Target PHP version (overrides config)}
                             {--path= : Specific path to scan (overrides config)}';
+
     protected $description = 'Check PHP compatibility using PHPCompatibility and PHPCS';
 
     public function handle()
     {
-        // Config defaults
-        $phpVersion = $this->option('php') ?: config('laravel-php-inspector.php_version', '8.4');
-        $exclude = config('laravel-php-inspector.exclude', ['vendor', 'storage']);
-        $failOnError = config('laravel-php-inspector.fail_on_error', true);
-        $showWarnings = config('laravel-php-inspector.show_warnings', true);
+        $phpVersion = $this->option('php') ?: '8.4';
+        $exclude = ['vendor', 'storage'];
+        $failOnError = true;
+        $showWarnings = true;
 
-        // Determine paths to scan
-        $paths = $this->option('path') ? [$this->option('path')] : [base_path()];
+        $paths = $this->option('path')
+            ? [$this->option('path')]
+            : [base_path('/')]; // keep it simple for now
 
-        $this->info("🔍 Checking PHP compatibility for PHP {$phpVersion}");
-        $this->info("📂 Paths to scan: " . implode(', ', $paths));
-        if (!empty($exclude)) {
-            $this->info("❌ Excluded paths: " . implode(', ', $exclude));
-        }
+        $this->info(" 🔍 Checking PHP compatibility for PHP {$phpVersion}");
+        $this->info(" 📂 Paths to scan: " . implode(', ', $paths));
+        $this->info(" ❌ Excluded paths: " . implode(', ', $exclude));
+
+        $ignorePatterns = array_merge(['*.blade.php'], array_map(fn($d) => "$d/*", $exclude));
 
         $allResults = [];
         $totalFilesScanned = 0;
 
         foreach ($paths as $path) {
-            // Run PHPCS once per path
             $command = [
-                base_path('vendor/bin/phpcs'),
+                base_path('vendor/squizlabs/php_codesniffer/bin/phpcs'),
                 '--standard=PHPCompatibility',
                 '--runtime-set', 'testVersion', $phpVersion,
                 '--report=json',
-                $path,
                 '--extensions=php',
-                '--ignore=*.blade.php,' . implode(',', $exclude),
+                '--ignore=' . implode(',', $ignorePatterns),
+                $path,
             ];
 
             if (!$showWarnings) {
                 $command[] = '--warning-severity=0';
             }
 
+            $this->line(' 🧩 Executing: ' . implode(' ', $command));
+
             $process = new Process($command);
+            $process->setWorkingDirectory(base_path());
             $process->setTimeout(null);
             $process->run();
+
+            $this->line(' ⚠️ STDERR: ' . $process->getErrorOutput());
+            $this->line(' 📤 STDOUT: ' . substr($process->getOutput(), 0, 200));
 
             $results = json_decode($process->getOutput(), true);
 
@@ -62,7 +67,6 @@ class CheckCompatibilityCommand extends Command
             }
         }
 
-        // Summary
         $totalErrors = 0;
         $totalWarnings = 0;
 
@@ -72,10 +76,9 @@ class CheckCompatibilityCommand extends Command
         }
 
         $this->info("\n📄 Total files scanned: {$totalFilesScanned}");
-        $this->info("❌ Total errors: {$totalErrors}");
-        $this->info("⚠️ Total warnings: {$totalWarnings}");
+        $this->info(" ❌ Total errors: {$totalErrors}");
+        $this->info(" ⚠️ Total warnings: {$totalWarnings}");
 
-        // Optional: show first 50 issues in table
         $tableData = [];
         foreach ($allResults as $file => $details) {
             foreach ($details['messages'] as $msg) {
