@@ -44,5 +44,22 @@ class PhpCompatCheckCommand extends Command
         $this->call('phpinspector-compat:merge-reports');
 
         $this->info("\n🎉 PHP Compatibility check completed! Report is stored in storage/app/public.");
+
+        // ✅ Read the merged report
+        $reportPath = storage_path('app/public/php-inspector-phpcompat_report.json');
+        if (file_exists($reportPath)) {
+            $allResults = json_decode(file_get_contents($reportPath), true);
+
+            $totalFiles = count($allResults);
+            $totalErrors = collect($allResults)->sum('errors');
+            $totalWarnings = collect($allResults)->sum('warnings');
+
+            // ✅ Display the summary
+            $this->info("\n📄 Total files scanned: {$totalFiles}");
+            $this->info(" ❌ Total errors: {$totalErrors}");
+            $this->info(" ⚠️ Total warnings: {$totalWarnings}");
+        } else {
+            $this->warn("⚠️ Report file not found at {$reportPath}");
+        }
     }
 }
