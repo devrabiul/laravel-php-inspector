@@ -48,7 +48,25 @@ class PhpCompatCheckCommand extends Command
         $this->cleanupTemporaryFiles();
 
         // ✅ Show summary
-        $reportPath = storage_path('app/public/php-inspector-phpcompat_report.json');
+        $reportDir = storage_path('app/php-inspector/reports');
+
+        if (!File::exists($reportDir)) {
+            $this->warn("⚠️ No report directory found at {$reportDir}");
+            return;
+        }
+
+        // Get latest merged report file
+        $latestReport = collect(File::files($reportDir))
+            ->sortByDesc(fn($f) => $f->getCTime())
+            ->first();
+
+        if (!$latestReport) {
+            $this->warn("⚠️ No merged report found in {$reportDir}");
+            return;
+        }
+
+        $reportPath = $latestReport->getPathname();
+
         if (file_exists($reportPath)) {
             $startTime = microtime(true);
 
@@ -63,14 +81,14 @@ class PhpCompatCheckCommand extends Command
             $errorRate = $totalFiles > 0 ? round(($filesWithIssues / $totalFiles) * 100, 2) : 0;
 
             $this->info("\n🎉 PHP Compatibility check completed!");
-            $this->info("\n📦 Report stored at: storage/app/public/php-inspector-phpcompat_report.json\n");
+            $this->info("📦 Report stored at: storage/app/php-inspector-phpcompat_report.json\n");
 
-            $this->line("\n📊 === Summary Report ===");
-            $this->line("\n📄 Total files scanned : <fg=green>{$totalFiles}</>");
-            $this->line("\n✅ Clean files         : <fg=green>{$cleanFiles}</>");
-            $this->line("\n🚨 Files with issues   : <fg=red>{$filesWithIssues}</> ({$errorRate}% of total)");
-            $this->line("\n❌ Total errors        : <fg=red>{$totalErrors}</>");
-            $this->line("\n⚠️  Total warnings      : <fg=yellow>{$totalWarnings}</>");
+            $this->line("📊 === Summary Report ===");
+            $this->line("📄 Total files scanned : <fg=green>{$totalFiles}</>");
+            $this->line("✅ Clean files         : <fg=green>{$cleanFiles}</>");
+            $this->line("🚨 Files with issues   : <fg=red>{$filesWithIssues}</> ({$errorRate}% of total)");
+            $this->line("❌ Total errors        : <fg=red>{$totalErrors}</>");
+            $this->line("⚠️  Total warnings      : <fg=yellow>{$totalWarnings}</>");
 
             $duration = round(microtime(true) - $_SERVER["REQUEST_TIME_FLOAT"], 2);
             $this->line("⏱️  Duration            : {$duration} sec");
