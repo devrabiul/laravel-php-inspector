@@ -9,47 +9,51 @@ use Illuminate\Support\Str;
 class MergeReportsCommand extends Command
 {
     protected $signature = 'phpinspector-compat:merge-reports';
-
-    protected $description = 'Merge all batch reports into a single JSON and display errors';
+    protected $description = 'Merge all batch reports into one final JSON report';
 
     public function handle()
     {
         $dir = storage_path('app/php-inspector/batches');
+
         if (!File::exists($dir)) {
             $this->error("No batch reports found.");
             return 1;
         }
 
         $files = File::files($dir);
-        $allResults = [];
+        $mergedResults = [];
 
         foreach ($files as $file) {
             $content = json_decode(File::get($file), true);
             if (isset($content['files'])) {
-                $allResults = array_merge($allResults, $content['files']);
+                foreach ($content['files'] as $path => $data) {
+                    $mergedResults[$path] = [
+                        'errors' => count(array_filter($data['messages'], fn($m) => $m['type'] === 'ERROR')),
+                        'warnings' => count(array_filter($data['messages'], fn($m) => $m['type'] === 'WARNING')),
+                        'messages' => $data['messages'],
+                    ];
+                }
             }
         }
 
+        // Save final JSON report
         $reportPath = storage_path('app/public/php-inspector-phpcompat_report.json');
-        file_put_contents($reportPath, json_encode($allResults, JSON_PRETTY_PRINT));
-        $this->info("💾 Final merged report: {$reportPath}");
+        File::put($reportPath, json_encode($mergedResults, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 
-        // Show errors in terminal (first 50)
-        $tableData = [];
-        foreach ($allResults as $file => $details) {
-            foreach ($details['messages'] as $msg) {
-                $tableData[] = [
-                    'File' => Str::after($file, base_path() . '/'),
-                    'Line' => $msg['line'],
-                    'Type' => $msg['type'],
-                    'Message' => $msg['message'],
-                ];
-            }
-        }
+        $this->info("💾 Final merged report saved: {$reportPath}");
 
-        if (!empty($tableData)) {
-            $this->line("\n🔹 Sample issues (first 50):");
-            $this->table(['File', 'Line', 'Type', 'Message'], array_slice($tableData, 0, 50));
-        }
+        // Optional: show summary in console
+        $totalFiles = count($mergedResults);
+        $totalErrors = collect($mergedResults)->sum('errors');
+        $totalWarnings = collect($mergedResults)->sum('warnings');
+
+        $this->info("\n📊 Summary:");
+        $this->info("📄 Total files: {$totalFiles}");
+        $this->info("❌ Errors: {$totalErrors}");
+        $this->info("⚠️ Warnings: {$totalWarnings}");
+
+        // Clean up batch directory
+        File::deleteDirectory($dir);
+        $this->info("\n🧹 Deleted all temporary batch reports.");
     }
 }
