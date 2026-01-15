@@ -137,7 +137,8 @@ class LaravelPhpInspectorServiceProvider extends ServiceProvider
      */
     private function updateProcessingDirectoryConfig(): void
     {
-        $scriptPath = realpath(dirname($_SERVER['SCRIPT_FILENAME']));
+        $script = $_SERVER['SCRIPT_FILENAME'] ?? getcwd();
+        $scriptPath = realpath(dirname($script));
         $basePath   = realpath(base_path());
         $publicPath = realpath(public_path());
 
