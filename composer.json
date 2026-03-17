@@ -42,7 +42,7 @@
     },
     "require": {
         "php": ">=8.0",
-        "phpcsstandards/php_codesniffer": "^4.0",
+        "squizlabs/php_codesniffer": "^4.0",
         "phpcompatibility/php-compatibility": "^9.3",
         "dealerdirect/phpcodesniffer-composer-installer": "^1.1"
     },
